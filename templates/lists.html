@@ -1,0 +1,24 @@
+{% extends 'layout.html' %}
+
+{% block content %}
+    {% if lists %}
+    <ul id='lists'>
+        {% for lst in lists %}
+            <li {% if todos_completed_count(lst) == (lst.todos | length) and (lst.todos | length) > 0 %} class="complete"{% endif %}>
+                <a href="{{ url_for('display_list', list_id=lst.id) }}">
+                    <h2>
+                        {{ lst.title }}
+                    </h2>
+                    <p>{{ todos_completed_count(lst) }}/{{ lst.todos | length }}</p>
+                </a>
+            </li>
+        {% endfor %}
+    </ul>
+    {% else %}
+        <p id="no_list">You don't have any todo lists. Why not create one?</p>
+    {% endif %}
+{% endblock %}
+
+{% block header_links %}
+    <a class='add' href='{{ url_for('add_todo_list') }}'>New List</a>
+{% endblock %}
