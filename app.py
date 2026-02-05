@@ -1,6 +1,7 @@
 from uuid import uuid4
 from functools import wraps
 import os
+import secrets
 from flask import (
                     abort,
                     flash,
@@ -10,19 +11,22 @@ from flask import (
                     request,
                     session,
                     url_for,
+                    g,
                     )
 from todos.utils import (
                         delete_todo,
                         error_for_list_title,
                         error_for_todo_item_name,
-                        find_list_by_id,
+                        # find_list_by_id,
                         find_todo_by_id,
                         mark_all_complete,
                         sort_todo_lists,
                         )
+                        
+from todos.session_persistence import SessionPersistence                        
 
 app = Flask(__name__)
-app.secret_key='secret1'
+app.secret_key=secrets.token_hex(32)
 
 # Helper functions
 def ensure_todo_positions(lst):
@@ -33,7 +37,7 @@ def require_list(f):
     @wraps(f)
     def decorated_function(*args, **kwargs):
         list_id = kwargs.get('list_id')
-        lst = find_list_by_id(list_id, session['lists'])
+        lst = g.storage.find_list(list_id)
         if not lst:
             abort(404)
 
@@ -55,9 +59,8 @@ def require_todo(f):
 
 # Routes
 @app.before_request
-def initialize_session():
-    if 'lists' not in session:
-        session['lists'] = []
+def load_storage():
+    g.storage = SessionPersistence(session)
 
 @app.route('/')
 def index():
@@ -76,7 +79,7 @@ def display_list(lst, list_id):
 
 @app.route('/lists')
 def get_lists():
-    lists = sort_todo_lists(session['lists'])
+    lists = sort_todo_lists(g.storage.all_lists())
     return render_template('lists.html', lists=lists)
 
 @app.route('/lists', methods=['POST'])

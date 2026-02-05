@@ -6,13 +6,6 @@ def error_for_list_title(title, lists):
     else:
         return None
 
-def find_list_by_id(list_id, lists):
-    for lst in lists:
-        if lst['id'] == list_id:
-            return lst
-
-    return None
-
 def find_todo_by_id(todo_id, todos):
     for todo in todos:
         if todo['id'] == todo_id:
