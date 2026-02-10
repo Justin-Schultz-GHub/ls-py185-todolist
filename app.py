@@ -17,13 +17,12 @@ from todos.utils import (
                         delete_todo,
                         error_for_list_title,
                         error_for_todo_item_name,
-                        # find_list_by_id,
                         find_todo_by_id,
                         mark_all_complete,
                         sort_todo_lists,
                         )
-                        
-from todos.session_persistence import SessionPersistence                        
+
+from todos.session_persistence import SessionPersistence
 
 app = Flask(__name__)
 app.secret_key=secrets.token_hex(32)
@@ -86,25 +85,19 @@ def get_lists():
 def create_list():
     title = request.form['list_title'].strip()
 
-    error = error_for_list_title(title, session['lists'])
+    error = error_for_list_title(title, g.storage.all_lists())
     if error:
         flash(error, 'error')
         return render_template('new_list.html', title=title)
 
-    session['lists'].append({
-        'id': str(uuid4()),
-        'title': title,
-        'todos': [],
-    })
-
+    g.storage.create_new_list(title)
     flash('The list has been created.', 'success')
-    session.modified = True
 
     return redirect(url_for('get_lists'))
 
 @app.route('/lists/<list_id>/edit')
 def edit_list(list_id):
-    lst = find_list_by_id(list_id, session['lists'])
+    lst = g.storage.find_list(list_id)
     ensure_todo_positions(lst)
 
     return render_template('edit_list.html', lst=lst)
@@ -121,15 +114,9 @@ def create_todo(lst, list_id):
         flash(error, 'error')
         return render_template('list.html', lst=lst, todo=todo)
 
-    lst['todos'].append({
-        'id': str(uuid4()),
-        'title': todo,
-        'completed': False,
-        'position': len(lst['todos']) + 1,
-        })
+    g.storage.create_new_todo(list_id, todo)
 
     flash('The todo item has been created.', 'success')
-    session.modified = True
 
     return redirect(url_for('display_list', list_id=lst['id']))
 
@@ -154,9 +141,10 @@ def reorder_todo_item(list_id, todo_id, lst=None, todo=None):
 @require_todo
 def toggle_todo_completion(lst, todo, list_id, todo_id):
     ensure_todo_positions(lst)
-    todo['completed'] = request.form['completed'] == 'True'
+    status = request.form['completed'] == 'True'
+    g.storage.toggle_todo_completion(list_id, todo_id, status)
+
     flash('Todo marked as completed.', 'success')
-    session.modified = True
 
     return redirect(url_for('display_list', list_id=list_id))
 
@@ -184,10 +172,9 @@ def complete_all_todos(lst, list_id):
 @require_list
 def delete_list(lst, list_id):
     ensure_todo_positions(lst)
-    session['lists'].remove(lst)
+    g.storage.delete_list(list_id)
 
     flash('Todo list successfully deleted.', 'success')
-    session.modified = True
 
     return redirect(url_for('get_lists'))
 
@@ -202,10 +189,9 @@ def rename_list(lst, list_id):
         flash(error, 'error')
         return render_template('edit_list.html', lst=lst)
 
-    lst['title'] = title
+    g.storage.rename_list_by_id(list_id, title)
 
     flash('Todo list successfully renamed.', 'success')
-    session.modified = True
 
     return redirect(url_for('display_list', list_id=list_id))
 
