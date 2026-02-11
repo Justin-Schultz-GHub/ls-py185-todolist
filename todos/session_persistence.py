@@ -54,3 +54,27 @@ class SessionPersistence:
         todo['completed'] = status
 
         self.session.modified = True
+
+    def delete_todo_from_list(self, lst, todo):
+        lst['todos'].remove(todo)
+
+        self.session.modified = True
+
+    def toggle_all_todo_completion(self, lst):
+        all_complete = all(todo['completed'] for todo in lst['todos'])
+        for todo in lst['todos']:
+            todo['completed'] = not all_complete
+
+        self.session.modified = True
+
+    def reorder_todo_item(self, lst, todo, direction):
+        position = todo['position']
+        swap_position = position + 1 if direction == 'down' else position - 1
+        swap_todo = next((todo_item for todo_item in lst['todos'] if todo_item['position'] == swap_position), None)
+
+        if swap_todo:
+            todo['position'], swap_todo['position'] = swap_todo['position'], todo['position']
+
+        lst['todos'].sort(key=lambda todo: todo['position'])
+
+        self.session.modified = True

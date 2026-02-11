@@ -20,13 +20,6 @@ def error_for_todo_item_name(todo):
             else None
             )
 
-def delete_todo(lst, todo):
-    lst['todos'].remove(todo)
-
-def mark_all_complete(lst):
-    for todo in lst['todos']:
-        todo['completed'] = True
-
 def is_list_complete(lst):
     return bool(lst['todos']) and all(todo['completed'] for todo in lst['todos'])
 

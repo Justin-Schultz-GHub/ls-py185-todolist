@@ -14,11 +14,9 @@ from flask import (
                     g,
                     )
 from todos.utils import (
-                        delete_todo,
                         error_for_list_title,
                         error_for_todo_item_name,
                         find_todo_by_id,
-                        mark_all_complete,
                         sort_todo_lists,
                         )
 
@@ -124,16 +122,8 @@ def create_todo(lst, list_id):
 @require_todo
 def reorder_todo_item(list_id, todo_id, lst=None, todo=None):
     ensure_todo_positions(lst)
-    position = todo['position']
     direction = request.form['direction']
-    swap_position = position + 1 if direction == 'down' else position - 1
-    swap_todo = next((todo_item for todo_item in lst['todos'] if todo_item['position'] == swap_position), None)
-
-    if swap_todo:
-        todo['position'], swap_todo['position'] = swap_todo['position'], todo['position']
-
-    lst['todos'].sort(key=lambda todo: todo['position'])
-    session.modified = True
+    g.storage.reorder_todo_item(lst, todo, direction)
 
     return redirect(url_for('display_list', list_id=lst['id']))
 
@@ -151,20 +141,18 @@ def toggle_todo_completion(lst, todo, list_id, todo_id):
 @app.route('/lists/<list_id>/todos/<todo_id>/delete', methods=['POST'])
 @require_todo
 def delete_todo_item(lst, todo, list_id, todo_id):
-    delete_todo(lst, todo)
+    g.storage.delete_todo_from_list(lst, todo)
     flash('Todo item successfully deleted.', 'success')
-    session.modified = True
 
     return redirect(url_for('display_list', list_id=list_id))
 
 @app.route('/lists/<list_id>/complete_all', methods=['POST'])
 @require_list
-def complete_all_todos(lst, list_id):
+def toggle_all_todo_completion(lst, list_id):
     ensure_todo_positions(lst)
-    mark_all_complete(lst)
+    g.storage.toggle_all_todo_completion(lst)
 
     flash('Todo marked as completed.', 'success')
-    session.modified = True
 
     return redirect(url_for('display_list', list_id=list_id))
 

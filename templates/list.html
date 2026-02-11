@@ -7,7 +7,7 @@
             <ul>
                 <li>
                     <form class="complete_all"
-                        action="{{ url_for('complete_all_todos', list_id=lst.id) }}"
+                        action="{{ url_for('toggle_all_todo_completion', list_id=lst.id) }}"
                         method="post">
                         <button class="check" type="submit">Complete All</button>
                     </form>
