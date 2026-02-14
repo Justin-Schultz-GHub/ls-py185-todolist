@@ -25,10 +25,6 @@ app = Flask(__name__)
 app.secret_key=secrets.token_hex(32)
 
 # Helper functions
-def ensure_todo_positions(lst):
-    for index, todo in enumerate(lst['todos']):
-        todo['position'] = index
-
 def require_list(f):
     @wraps(f)
     def decorated_function(*args, **kwargs):
@@ -69,8 +65,6 @@ def add_todo_list():
 @app.route('/lists/<int:list_id>')
 @require_list
 def display_list(lst, list_id):
-    ensure_todo_positions(lst)
-
     return render_template('list.html', lst=lst)
 
 @app.route('/lists')
@@ -95,7 +89,6 @@ def create_list():
 @app.route('/lists/<int:list_id>/edit')
 def edit_list(list_id):
     lst = g.storage.find_list(list_id)
-    ensure_todo_positions(lst)
 
     return render_template('edit_list.html', lst=lst)
 
@@ -103,8 +96,6 @@ def edit_list(list_id):
 @require_list
 def create_todo(lst, list_id):
     todo = request.form['todo'].strip()
-
-    ensure_todo_positions(lst)
 
     error = error_for_todo_item_name(todo)
     if error:
@@ -120,7 +111,6 @@ def create_todo(lst, list_id):
 @app.route('/lists/<int:list_id>/todos/<int:todo_id>/move', methods=['POST'])
 @require_todo
 def reorder_todo_item(list_id, todo_id, lst=None, todo=None):
-    ensure_todo_positions(lst)
     direction = request.form['direction']
     g.storage.reorder_todo_item(lst, todo, direction)
 
@@ -129,7 +119,6 @@ def reorder_todo_item(list_id, todo_id, lst=None, todo=None):
 @app.route('/lists/<int:list_id>/todos/<int:todo_id>/toggle', methods=['POST'])
 @require_todo
 def toggle_todo_completion(lst, todo, list_id, todo_id):
-    ensure_todo_positions(lst)
     status = request.form['completed'] == 'True'
     g.storage.toggle_todo_completion(list_id, todo_id, status)
 
@@ -148,7 +137,6 @@ def delete_todo_item(lst, todo, list_id, todo_id):
 @app.route('/lists/<int:list_id>/complete_all', methods=['POST'])
 @require_list
 def toggle_all_todo_completion(lst, list_id):
-    ensure_todo_positions(lst)
     g.storage.toggle_all_todo_completion(lst)
 
     flash('Todo marked as completed.', 'success')
@@ -158,7 +146,6 @@ def toggle_all_todo_completion(lst, list_id):
 @app.route('/lists/<int:list_id>/delete', methods=['POST'])
 @require_list
 def delete_list(lst, list_id):
-    ensure_todo_positions(lst)
     g.storage.delete_list(list_id)
 
     flash('Todo list successfully deleted.', 'success')
@@ -168,7 +155,6 @@ def delete_list(lst, list_id):
 @app.route('/lists/<int:list_id>/rename', methods=['POST'])
 @require_list
 def rename_list(lst, list_id):
-    ensure_todo_positions(lst)
     title = request.form['list_title'].strip()
 
     error = error_for_list_title(title, g.storage.all_lists())
