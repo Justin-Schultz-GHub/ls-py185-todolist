@@ -5,7 +5,9 @@ CREATE TABLE lists (
 
 CREATE TABLE todos (
     id SERIAL PRIMARY KEY,
-    name VARCHAR(100) NOT NULL,
-    complete BOOLEAN NOT NULL DEFAULT FALSE,
-    list_id INTEGER NOT NULL REFERENCES lists(id) ON DELETE CASCADE
+    title VARCHAR(100) NOT NULL,
+    completed BOOLEAN NOT NULL DEFAULT FALSE,
+    list_id INTEGER NOT NULL REFERENCES lists(id) ON DELETE CASCADE,
+    position_idx INTEGER NOT NULL,
+    unique(list_id, position_idx)
 );

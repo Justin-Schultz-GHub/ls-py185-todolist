@@ -33,7 +33,44 @@ def require_list_exists(f):
 
 class DatabasePersistence:
     def __init__(self):
-        pass
+        self._setup_schema()
+
+    def _setup_schema(self):
+        with self._database_connect() as connection:
+            with connection.cursor() as cursor:
+                cursor.execute('''
+                                SELECT COUNT(*)
+                                FROM information_schema.tables
+                                WHERE table_schema = 'public'
+                                    and table_name = 'lists';
+                                ''')
+                if cursor.fetchone()[0] == 0:
+                    cursor.execute('''
+                                    CREATE TABLE lists (
+                                    id SERIAL PRIMARY KEY,
+                                    title VARCHAR(100) UNIQUE NOT NULL
+                                    );
+                                ''')
+
+                cursor.execute('''
+                            SELECT COUNT(*)
+                            FROM information_schema.tables
+                            WHERE table_schema = 'public'
+                                and table_name = 'todos';
+                            ''')
+
+                if cursor.fetchone()[0] == 0:
+                    cursor.execute('''
+                                    CREATE TABLE todos (
+                                    id SERIAL PRIMARY KEY,
+                                    title VARCHAR(100) NOT NULL,
+                                    completed BOOLEAN NOT NULL DEFAULT FALSE,
+                                    list_id INTEGER NOT NULL
+                                        REFERENCES lists(id) ON DELETE CASCADE,
+                                    position_idx INTEGER NOT NULL,
+                                    unique(list_id, position_idx)
+                                    );
+                                ''')
 
     @contextmanager
     def _database_connect(self):
@@ -103,7 +140,7 @@ class DatabasePersistence:
                 SELECT * FROM lists
                 WHERE id = %s
                 '''
-        logger.info("Executing query: %s with list_id: %s", query, list_id)
+        logger.info('Executing query: %s with list_id: %s', query, list_id)
 
         with self._database_connect() as connection:
             with connection.cursor(cursor_factory=DictCursor) as cursor:
@@ -119,7 +156,7 @@ class DatabasePersistence:
         query = '''
                 SELECT * FROM todos
                 WHERE list_id = %s
-                ORDER BY position
+                ORDER BY position_idx
                 '''
         logger.info('Executing query: %s with list_id: %s', query, list_id)
         with self._database_connect() as connection:
@@ -172,11 +209,11 @@ class DatabasePersistence:
 
     def create_new_todo(self, list_id, title):
         query = '''
-                INSERT INTO todos (title, list_id, position)
+                INSERT INTO todos (title, list_id, position_idx)
                 values (
                     %s,
                     %s,
-                    (SELECT COALESCE(MAX(position), 0) + 1 FROM todos
+                    (SELECT COALESCE(MAX(position_idx), 0) + 1 FROM todos
                     WHERE list_id = %s)
                 );
                 '''
@@ -243,7 +280,7 @@ class DatabasePersistence:
         with self._database_connect() as connection:
             with connection.cursor() as cursor:
                 position_query = '''
-                        SELECT position FROM todos
+                        SELECT position_idx FROM todos
                         WHERE list_id = %s and id = %s;
                         '''
                 logger.info('''
@@ -271,7 +308,7 @@ class DatabasePersistence:
                     return
 
                 max_position_query = '''
-                        SELECT COALESCE(MAX(position), 0) FROM todos
+                        SELECT COALESCE(MAX(position_idx), 0) FROM todos
                         WHERE list_id = %s;
                         '''
                 logger.info('''
@@ -287,17 +324,17 @@ class DatabasePersistence:
 
                 temp_update_query = '''
                                     UPDATE todos
-                                    SET position = -1
+                                    SET position_idx = -1
                                     WHERE id = %s;
                                     '''
                 swap_partner_query = '''
                                     UPDATE todos
-                                    SET position = %s
-                                    WHERE list_id = %s AND position = %s;
+                                    SET position_idx = %s
+                                    WHERE list_id = %s AND position_idx = %s;
                                     '''
                 set_todo_query = '''
                                     UPDATE todos
-                                    SET position = %s
+                                    SET position_idx = %s
                                     WHERE id = %s;
                                 '''
 
