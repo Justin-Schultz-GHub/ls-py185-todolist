@@ -22,35 +22,11 @@ from todos.utils import (
 from todos.database_persistence import (
                                         DatabasePersistence,
                                         require_todo_exists,
+                                        require_list_exists,
                                         )
 
 app = Flask(__name__)
 app.secret_key=secrets.token_hex(32)
-
-# Helper functions
-def require_list(f):
-    @wraps(f)
-    def decorated_function(*args, **kwargs):
-        list_id = kwargs.get('list_id')
-        lst = g.storage.find_list(list_id)
-        if not lst:
-            abort(404)
-
-        return f(lst=lst, *args, **kwargs)
-
-    return decorated_function
-
-def require_todo(f):
-    @wraps(f)
-    @require_list
-    def decorated_function(lst, *args, **kwargs):
-        todo_id = kwargs.get('todo_id')
-        todo = find_todo_by_id(todo_id, lst['todos'])
-        if not todo:
-            abort(404)
-        return f(lst=lst, todo=todo, *args, **kwargs)
-
-    return decorated_function
 
 # Routes
 @app.before_request
@@ -66,8 +42,9 @@ def add_todo_list():
     return render_template('new_list.html')
 
 @app.route('/lists/<int:list_id>')
-@require_list
-def display_list(lst, list_id):
+@require_list_exists
+def display_list(list_id):
+    lst = g.storage.find_list(list_id)
     return render_template('list.html', lst=lst)
 
 @app.route('/lists')
@@ -96,28 +73,29 @@ def edit_list(list_id):
     return render_template('edit_list.html', lst=lst)
 
 @app.route('/lists/<int:list_id>/todos', methods=['POST'])
-@require_list
-def create_todo(lst, list_id):
+@require_list_exists
+def create_todo(list_id):
     todo = request.form['todo'].strip()
 
     error = error_for_todo_item_name(todo)
     if error:
         flash(error, 'error')
+        lst = g.storage.find_list(list_id)
         return render_template('list.html', lst=lst, todo=todo)
 
     g.storage.create_new_todo(list_id, todo)
 
     flash('The todo item has been created.', 'success')
 
-    return redirect(url_for('display_list', list_id=lst['id']))
+    return redirect(url_for('display_list', list_id=list_id))
 
 @app.route('/lists/<int:list_id>/todos/<int:todo_id>/move', methods=['POST'])
-@require_todo
-def reorder_todo_item(list_id, todo_id, lst=None, todo=None):
+@require_todo_exists
+def reorder_todo_item(list_id, todo_id):
     direction = request.form['direction']
-    g.storage.reorder_todo_item(lst, todo, direction)
+    g.storage.reorder_todo_item(list_id, todo_id, direction)
 
-    return redirect(url_for('display_list', list_id=lst['id']))
+    return redirect(url_for('display_list', list_id=list_id))
 
 @app.route('/lists/<int:list_id>/todos/<int:todo_id>/delete', methods=['POST'])
 @require_todo_exists
@@ -138,8 +116,8 @@ def toggle_todo_completion(list_id, todo_id):
     return redirect(url_for('display_list', list_id=list_id))
 
 @app.route('/lists/<int:list_id>/complete_all', methods=['POST'])
-@require_list
-def toggle_all_todo_completion(lst, list_id):
+@require_list_exists
+def toggle_all_todo_completion(list_id):
     g.storage.toggle_all_todo_completion(list_id)
 
     flash('Todo marked as completed.', 'success')
@@ -147,8 +125,8 @@ def toggle_all_todo_completion(lst, list_id):
     return redirect(url_for('display_list', list_id=list_id))
 
 @app.route('/lists/<int:list_id>/delete', methods=['POST'])
-@require_list
-def delete_list(lst, list_id):
+@require_list_exists
+def delete_list(list_id):
     g.storage.delete_list(list_id)
 
     flash('Todo list successfully deleted.', 'success')
@@ -156,13 +134,14 @@ def delete_list(lst, list_id):
     return redirect(url_for('get_lists'))
 
 @app.route('/lists/<int:list_id>/rename', methods=['POST'])
-@require_list
-def rename_list(lst, list_id):
+@require_list_exists
+def rename_list(list_id):
     title = request.form['list_title'].strip()
 
     error = error_for_list_title(title, g.storage.all_lists())
     if error:
         flash(error, 'error')
+        lst = g.storage.find_list(list_id)
         return render_template('edit_list.html', lst=lst)
 
     g.storage.rename_list_by_id(list_id, title)

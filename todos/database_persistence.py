@@ -23,7 +23,13 @@ def require_todo_exists(f):
     return decorated_function
 
 def require_list_exists(f):
-    pass
+    @wraps(f)
+    def decorated_function(*args, **kwargs):
+        list_id = kwargs.get('list_id')
+        if not g.storage.list_exists(list_id):
+            abort(404)
+        return f(*args, **kwargs)
+    return decorated_function
 
 class DatabasePersistence:
     def __init__(self):
@@ -58,7 +64,22 @@ class DatabasePersistence:
         return row is not None
 
     def list_exists(self, list_id):
-        pass
+        query = '''
+                SELECT 1 FROM lists
+                WHERE id = %s;
+                '''
+        with self._database_connect() as connection:
+            with connection.cursor() as cursor:
+                logger.info('''
+                            Executing query: %s with list_id: %s
+                            ''',
+                            query, list_id)
+
+                cursor.execute(query, (list_id,))
+
+                row = cursor.fetchone()
+
+        return row is not None
 
     def all_lists(self):
         query = 'SELECT * FROM lists'
@@ -218,72 +239,87 @@ class DatabasePersistence:
 
                 cursor.execute(query, (todo_id,))
 
-    def reorder_todo_item(self, lst, todo, direction):
-        current_position = todo['position']
-
-        if direction == 'up':
-            target_position = current_position - 1
-
-            if target_position < 1:
-                return
-
-        elif direction == 'down':
-            target_position = current_position + 1
-
-            with self._database_connect() as connection:
-                with connection.cursor() as cursor:
-                    query = '''
-                            SELECT COALESCE(MAX(position), 0) FROM todos
-                            WHERE list_id = %s;
-                            '''
-                    logger.info('''
-                                Executing query: %s with list_id: %s
-                                ''',
-                                query, lst['id'])
-                    cursor.execute(query, (lst['id'],))
-
-                    max_position = cursor.fetchone()[0]
-
-            if target_position > max_position:
-                return
-
-        temp_update_query = '''
-                            UPDATE todos
-                            SET position = -1
-                            WHERE id = %s;
-                            '''
-        swap_partner_query = '''
-                            UPDATE todos
-                            SET position = %s
-                            WHERE list_id = %s AND position = %s;
-                            '''
-        set_todo_query = '''
-                            UPDATE todos
-                            SET position = %s
-                            WHERE id = %s;
-                        '''
-
+    def reorder_todo_item(self, list_id, todo_id, direction):
         with self._database_connect() as connection:
             with connection.cursor() as cursor:
+                position_query = '''
+                        SELECT position FROM todos
+                        WHERE list_id = %s and id = %s;
+                        '''
+                logger.info('''
+                            Executing query: %s with list_id: %s,
+                            and todo_id: %s
+                            ''',
+                            position_query, list_id, todo_id)
+                cursor.execute(position_query, (list_id, todo_id))
+
+                row = cursor.fetchone()
+
+                if not row:
+                    return
+
+                current_position = row[0]
+
+                if direction == 'up':
+                    target_position = current_position - 1
+                elif direction == 'down':
+                    target_position = current_position + 1
+                else:
+                    return
+
+                if target_position < 1:
+                    return
+
+                max_position_query = '''
+                        SELECT COALESCE(MAX(position), 0) FROM todos
+                        WHERE list_id = %s;
+                        '''
+                logger.info('''
+                            Executing query: %s with list_id: %s
+                            ''',
+                            max_position_query, list_id)
+                cursor.execute(max_position_query, (list_id,))
+
+                max_position = cursor.fetchone()[0]
+
+                if target_position > max_position:
+                    return
+
+                temp_update_query = '''
+                                    UPDATE todos
+                                    SET position = -1
+                                    WHERE id = %s;
+                                    '''
+                swap_partner_query = '''
+                                    UPDATE todos
+                                    SET position = %s
+                                    WHERE list_id = %s AND position = %s;
+                                    '''
+                set_todo_query = '''
+                                    UPDATE todos
+                                    SET position = %s
+                                    WHERE id = %s;
+                                '''
+
                 logger.info(
                             'Executing query: %s with todo id: %s',
-                            temp_update_query, todo['id']
+                            temp_update_query, todo_id
                             )
-                cursor.execute(temp_update_query, (todo['id'],))
+                cursor.execute(temp_update_query, (todo_id,))
 
                 logger.info('''
                             Executing query: %s with list_id: %s
                             and target_position: %s
                             ''',
-                            swap_partner_query, lst['id'], target_position)
+                            swap_partner_query, list_id, target_position)
                 cursor.execute(swap_partner_query,
                                 (
-                                    current_position, lst['id'], target_position
+                                    current_position, list_id, target_position
                                 )
                             )
 
                 logger.info(
                             'Executing query: %s with todo id: %s',
-                            set_todo_query, todo['id']
+                            set_todo_query, todo_id
                             )
-                cursor.execute(set_todo_query, (target_position, todo['id']))
+                cursor.execute(set_todo_query, (target_position, todo_id))
