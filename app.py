@@ -19,7 +19,10 @@ from todos.utils import (
                         sort_todo_lists,
                         )
 
-from todos.database_persistence import DatabasePersistence
+from todos.database_persistence import (
+                                        DatabasePersistence,
+                                        require_todo_exists,
+                                        )
 
 app = Flask(__name__)
 app.secret_key=secrets.token_hex(32)
@@ -116,28 +119,28 @@ def reorder_todo_item(list_id, todo_id, lst=None, todo=None):
 
     return redirect(url_for('display_list', list_id=lst['id']))
 
-@app.route('/lists/<int:list_id>/todos/<int:todo_id>/toggle', methods=['POST'])
-@require_todo
-def toggle_todo_completion(lst, todo, list_id, todo_id):
-    status = request.form['completed'] == 'True'
-    g.storage.toggle_todo_completion(list_id, todo_id, status)
-
-    flash('Todo marked as completed.', 'success')
+@app.route('/lists/<int:list_id>/todos/<int:todo_id>/delete', methods=['POST'])
+@require_todo_exists
+def delete_todo_item(list_id, todo_id):
+    g.storage.delete_todo_from_list(todo_id)
+    flash('Todo item successfully deleted.', 'success')
 
     return redirect(url_for('display_list', list_id=list_id))
 
-@app.route('/lists/<int:list_id>/todos/<int:todo_id>/delete', methods=['POST'])
-@require_todo
-def delete_todo_item(lst, todo, list_id, todo_id):
-    g.storage.delete_todo_from_list(lst, todo)
-    flash('Todo item successfully deleted.', 'success')
+@app.route('/lists/<int:list_id>/todos/<int:todo_id>/toggle', methods=['POST'])
+@require_todo_exists
+def toggle_todo_completion(list_id, todo_id):
+    status = request.form['completed'] == 'True'
+    g.storage.toggle_todo_completion(todo_id, status)
+
+    flash('Todo marked as completed.', 'success')
 
     return redirect(url_for('display_list', list_id=list_id))
 
 @app.route('/lists/<int:list_id>/complete_all', methods=['POST'])
 @require_list
 def toggle_all_todo_completion(lst, list_id):
-    g.storage.toggle_all_todo_completion(lst)
+    g.storage.toggle_all_todo_completion(list_id)
 
     flash('Todo marked as completed.', 'success')
 
