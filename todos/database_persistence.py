@@ -1,3 +1,4 @@
+import os
 import logging
 import psycopg2
 from psycopg2.extras import DictCursor
@@ -74,7 +75,10 @@ class DatabasePersistence:
 
     @contextmanager
     def _database_connect(self):
-        connection = psycopg2.connect(dbname='todolist')
+        if os.environ.get('FLASK_ENV') == 'production':
+            connection = psycopg2.connect(os.environ['DATABASE_URL'])
+        else:
+            connection = psycopg2.connect(dbname='todolist')
 
         try:
             with connection:
