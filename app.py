@@ -15,7 +15,6 @@ from flask import (
 from todos.utils import (
                         error_for_list_title,
                         error_for_todo_item_name,
-                        find_todo_by_id,
                         sort_todo_lists,
                         )
 
@@ -45,6 +44,7 @@ def add_todo_list():
 @require_list_exists
 def display_list(list_id):
     lst = g.storage.find_list(list_id)
+    lst['todos'] = g.storage.find_todos_for_list(list_id)
     return render_template('list.html', lst=lst)
 
 @app.route('/lists')
@@ -84,7 +84,6 @@ def create_todo(list_id):
         return render_template('list.html', lst=lst, todo=todo)
 
     g.storage.create_new_todo(list_id, todo)
-
     flash('The todo item has been created.', 'success')
 
     return redirect(url_for('display_list', list_id=list_id))
@@ -110,7 +109,6 @@ def delete_todo_item(list_id, todo_id):
 def toggle_todo_completion(list_id, todo_id):
     status = request.form['completed'] == 'True'
     g.storage.toggle_todo_completion(todo_id, status)
-
     flash('Todo marked as completed.', 'success')
 
     return redirect(url_for('display_list', list_id=list_id))
@@ -119,7 +117,6 @@ def toggle_todo_completion(list_id, todo_id):
 @require_list_exists
 def toggle_all_todo_completion(list_id):
     g.storage.toggle_all_todo_completion(list_id)
-
     flash('Todo marked as completed.', 'success')
 
     return redirect(url_for('display_list', list_id=list_id))
@@ -128,7 +125,6 @@ def toggle_all_todo_completion(list_id):
 @require_list_exists
 def delete_list(list_id):
     g.storage.delete_list(list_id)
-
     flash('Todo list successfully deleted.', 'success')
 
     return redirect(url_for('get_lists'))
@@ -145,17 +141,9 @@ def rename_list(list_id):
         return render_template('edit_list.html', lst=lst)
 
     g.storage.rename_list_by_id(list_id, title)
-
     flash('Todo list successfully renamed.', 'success')
 
     return redirect(url_for('display_list', list_id=list_id))
-
-# Context processors
-@app.context_processor
-def todos_completed():
-    def todos_completed_count(lst):
-        return sum(1 for todo in lst['todos'] if todo['completed'])
-    return {'todos_completed_count': todos_completed_count}
 
 if __name__ == "__main__":
     if os.environ.get('FLASK_ENV') == 'production':

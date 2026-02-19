@@ -123,7 +123,16 @@ class DatabasePersistence:
         return row is not None
 
     def all_lists(self):
-        query = 'SELECT * FROM lists'
+        query = '''
+                SELECT lists.*,
+                       COUNT(todos.id) AS todos_count,
+                       COUNT(NULLIF(todos.completed, TRUE)) AS todos_remaining,
+                       COUNT(todos.id) - COUNT(NULLIF(todos.completed, TRUE)) AS todos_completed
+                FROM lists
+                LEFT JOIN todos ON todos.list_id = lists.id
+                GROUP BY lists.id
+                ORDER BY lists.title;
+                '''
         logger.info('Executing query: %s', query)
 
         with self._database_connect() as connection:
@@ -133,16 +142,19 @@ class DatabasePersistence:
 
         lists = [dict(result) for result in results]
 
-        for lst in lists:
-            todos = self._find_todos_for_list(lst['id'])
-            lst.setdefault('todos', todos)
-
         return lists
 
     def find_list(self, list_id):
-        query = '''
-                SELECT * FROM lists
-                WHERE id = %s
+        query ='''
+                SELECT lists.*,
+                       COUNT(todos.id) AS todos_count,
+                       COUNT(NULLIF(todos.completed, TRUE)) AS todos_remaining,
+                       COUNT(todos.id) - COUNT(NULLIF(todos.completed, TRUE)) AS todos_completed
+                FROM lists
+                LEFT JOIN todos ON todos.list_id = lists.id
+                WHERE lists.id = %s
+                GROUP BY lists.id
+                ORDER BY lists.title;
                 '''
         logger.info('Executing query: %s with list_id: %s', query, list_id)
 
@@ -151,12 +163,9 @@ class DatabasePersistence:
                 cursor.execute(query, (list_id,))
                 lst = dict(cursor.fetchone())
 
-        todos = self._find_todos_for_list(list_id)
-        lst.setdefault('todos', todos)
-
         return lst
 
-    def _find_todos_for_list(self, list_id):
+    def find_todos_for_list(self, list_id):
         query = '''
                 SELECT * FROM todos
                 WHERE list_id = %s

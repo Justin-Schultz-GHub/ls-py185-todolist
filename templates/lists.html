@@ -4,12 +4,12 @@
     {% if lists %}
     <ul id='lists'>
         {% for lst in lists %}
-            <li {% if todos_completed_count(lst) == (lst.todos | length) and (lst.todos | length) > 0 %} class="complete"{% endif %}>
+            <li class="{{ 'complete' if lst.todos_completed == lst.todos_count and lst.todos_count > 0 else '' }}">
                 <a href="{{ url_for('display_list', list_id=lst.id) }}">
                     <h2>
                         {{ lst.title }}
                     </h2>
-                    <p>{{ todos_completed_count(lst) }}/{{ lst.todos | length }}</p>
+                    <p>{{ lst.todos_completed }}/{{ lst.todos_count }}</p>
                 </a>
             </li>
         {% endfor %}
